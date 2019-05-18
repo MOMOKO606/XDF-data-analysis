@@ -4,64 +4,135 @@ Created on Fri Jun 15 00:15:47 2018
 
 @author: bianl
 """
-
-
-def GetIndex( CLASS_DATE_POS ):
+def GetDateLimit( CLASS_DATE_POS ):
     """
-    function: 根据用户输入的起始日期和班表中的日期，计算所需循环数据的角标index。
+    function: 班表中的上课日期可能不是排序好的，此时需要遍历班表，获取最小和最大日期。
+    :param CLASS_DATE_POS: 上课日期在班表中的位置（列数）。
+    :return: mindate & maxdate，即此班表中的日期范围。
+    """
+
+    #  班表的行数。
+    m = table.nrows
+    #  赋初值。
+    mindate = xlrd.xldate_as_datetime(table.row_values(1)[CLASS_DATE_POS], 0)
+    maxdate = xlrd.xldate_as_datetime(table.row_values(1)[CLASS_DATE_POS], 0)
+
+    #  excel班表为1到m行，读入table后自动转为0到m-1行。
+    #  第0行为header，第1行赋初值，所以从第2行循环至第m-1行。
+    for i in range(2, m):
+        #  每个班上课的日期。
+        tmpdate = xlrd.xldate_as_datetime(table.row_values(i)[CLASS_DATE_POS], 0)
+        if tmpdate < mindate:
+            mindate = tmpdate
+        if tmpdate > maxdate:
+            maxdate = tmpdate
+    return mindate, maxdate
+
+
+def GetDateRange( CLASS_DATE_POS ):
+    """
+    function: 根据用户输入的起始日期和班表中的日期，计算所需的日期范围。
     :param CLASS_DATE_POS: 常量，表示班表中日期位于第几列。
-    :return: 班表中起始到终止数据的index，[start, end]。
-             st, ft, mindate, maxdate在输出报告中会用到。
+    :return: 日期范围startdate, enddate;
+            mindate, maxdate为班表中的最小和最大日期范围，在输出报告中会用到。
     """
 
     #  转换excel日期到datetime格式，并找到table中的最小和最大日期。
     #  注意，excel中的日期格式应为2018/10/22形式，其他形式需在excel中先进行预处理。
-    mindate = xlrd.xldate_as_datetime(table.row_values(1)[CLASS_DATE_POS], 0)  # 班表中的最早日期。
-    maxdate = xlrd.xldate_as_datetime(table.row_values(rows - 1)[CLASS_DATE_POS], 0)  # 班表中的最晚日期。
+    [mindate, maxdate] = GetDateLimit(CLASS_DATE_POS)
 
-    #  根据用户输入的时间范围，找出table中的index
+    #  根据用户输入的日期范围，确定最终的日期范围。
     while True:
-        #  输入查询的起始与终止时间，不做任何输入直接回车表示使用Default value，即班表中的全部时间。
+        #  输入查询的起始与终止日期，不做任何输入直接回车表示使用Default value，即班表中的全部日期。
         st = input("Please enter start date (e.g. 2015-12-21): ")
         ft = input("Please enter end date (e.g. 2015-12-21): ")
 
         if len(st) < 1:  # Default value, 从第1行开始（第0行为header）
-            start = 1
+            startdate = mindate
         else:
             try:
                 stmp = datetime.datetime.strptime(st, "%Y-%m-%d")  # str转datetime
                 if stmp <= mindate:
-                    start = 1
+                    startdate = mindate
                 else:
-                    for i in range(1, rows - 1):
-                        curdate = xlrd.xldate_as_datetime(table.row_values(i)[CLASS_DATE_POS], 0)
-                        if curdate == stmp:
-                            start = i
-                            break
+                    startdate = stmp
             except:
                 print("Please re-enter start date in this 2015-12-21 format. ")
                 continue
 
         if len(ft) < 1:  # Default value, 在最后一行结束（Python下标从0开始，故最后一行index比excel小1）
-            end = rows - 1
+            enddate = maxdate
             break
         else:
             try:
                 etmp = datetime.datetime.strptime(ft, "%Y-%m-%d")
                 if etmp >= maxdate:
-                    end = rows - 1
+                    enddate = maxdate
                 else:
-                    for i in range(max(2, start), rows - 1):  # i至少从2开始
-                        curdate = xlrd.xldate_as_datetime(table.row_values(i)[CLASS_DATE_POS], 0)
-                        predate = xlrd.xldate_as_datetime(table.row_values(i - 1)[CLASS_DATE_POS], 0)
-                        if predate <= etmp and curdate > etmp:
-                            end = i - 1
-                            break
+                    enddate = etmp
                 break
             except:
                 print("Please re-enter end date in this 2015-12-21 format. ")
                 continue
-    return [start, end, st, ft, mindate, maxdate]
+    return [startdate, enddate, mindate, maxdate]
+
+# def GetIndex( CLASS_DATE_POS ):
+#     """
+#     function: 根据用户输入的起始日期和班表中的日期，计算所需循环数据的角标index。
+#     :param CLASS_DATE_POS: 常量，表示班表中日期位于第几列。
+#     :return: 班表中起始到终止数据的index，[start, end]。
+#              st, ft, mindate, maxdate在输出报告中会用到。
+#     """
+#
+#     #  转换excel日期到datetime格式，并找到table中的最小和最大日期。
+#     #  注意，excel中的日期格式应为2018/10/22形式，其他形式需在excel中先进行预处理。
+#     # mindate = xlrd.xldate_as_datetime(table.row_values(1)[CLASS_DATE_POS], 0)  # 班表中的最早日期。
+#     # maxdate = xlrd.xldate_as_datetime(table.row_values(rows - 1)[CLASS_DATE_POS], 0)  # 班表中的最晚日期。
+#     [mindate, maxdate] = GetDateRange(CLASS_DATE_POS)
+#
+#     #  根据用户输入的时间范围，找出table中的index
+#     while True:
+#         #  输入查询的起始与终止时间，不做任何输入直接回车表示使用Default value，即班表中的全部时间。
+#         st = input("Please enter start date (e.g. 2015-12-21): ")
+#         ft = input("Please enter end date (e.g. 2015-12-21): ")
+#
+#         if len(st) < 1:  # Default value, 从第1行开始（第0行为header）
+#             start = 1
+#         else:
+#             try:
+#                 stmp = datetime.datetime.strptime(st, "%Y-%m-%d")  # str转datetime
+#                 if stmp <= mindate:
+#                     start = 1
+#                 else:
+#                     for i in range(1, rows - 1):
+#                         curdate = xlrd.xldate_as_datetime(table.row_values(i)[CLASS_DATE_POS], 0)
+#                         if curdate == stmp:
+#                             start = i
+#                             break
+#             except:
+#                 print("Please re-enter start date in this 2015-12-21 format. ")
+#                 continue
+#
+#         if len(ft) < 1:  # Default value, 在最后一行结束（Python下标从0开始，故最后一行index比excel小1）
+#             end = rows - 1
+#             break
+#         else:
+#             try:
+#                 etmp = datetime.datetime.strptime(ft, "%Y-%m-%d")
+#                 if etmp >= maxdate:
+#                     end = rows - 1
+#                 else:
+#                     for i in range(max(2, start), rows - 1):  # i至少从2开始
+#                         curdate = xlrd.xldate_as_datetime(table.row_values(i)[CLASS_DATE_POS], 0)
+#                         predate = xlrd.xldate_as_datetime(table.row_values(i - 1)[CLASS_DATE_POS], 0)
+#                         if predate <= etmp and curdate > etmp:
+#                             end = i - 1
+#                             break
+#                 break
+#             except:
+#                 print("Please re-enter end date in this 2015-12-21 format. ")
+#                 continue
+#     return [start, end, st, ft, mindate, maxdate]
 
 
 def GetDep( DEPT_TYPE ):
@@ -208,7 +279,7 @@ rows = table.nrows
 cols = table.ncols
 
 #  STEP1. 根据用户输入的时间范围，找出table中的index。
-[start, end, st, ft, mindate, maxdate] = GetIndex( CLASS_DATE_POS )
+[startdate, enddate, mindate, maxdate] = GetDateRange( CLASS_DATE_POS )
 
 #  STEP2. 用户输入要查询的项目部门。
 Dep = GetDep( DEPT_TYPE )
@@ -227,11 +298,16 @@ resclstab = []  # Result Class Table.
 classes = {}
 #  读入excel
 header = table.row_values(0)  # 第一行为表头。
-for i in range(start, end):
+for i in range(1, rows):
     r = table.row_values(i)
+    xlrd.xldate_as_datetime(r[CLASS_DATE_POS], 0)
+    curdate = xlrd.xldate_as_datetime(r[CLASS_DATE_POS], 0)  # 当前日期。
     curdep = r[DEPT_POS]  # 当前部门。
     curcls = r[CLASS_POS]  # 当前课程种类。
     #  Sentinels
+    #  Date Constraint.
+    if curdate < startdate or curdate > enddate:
+        continue
     #  Department Constraint.
     if len(Dep) >= 1:  # 没有使用default的情况。
         if Dep not in curdep:
@@ -318,14 +394,14 @@ totaltn = len(teacherlist.keys())
 
 #  输出3个结果文件。
 #  输出结果文件1：“Summary.txt”.
-if len(st) < 1:
-    st = mindate.strftime("%Y-%m-%d")
-if len(ft) < 1:
-    ft = maxdate.strftime("%Y-%m-%d")
 if len(Dep) < 1:
     Dep = "全部项目部"
 if len(cyconsts) < 1:
     cyconsts = "全部"
+
+#  datetime转字符串。
+st = startdate.strftime("%Y-%m-%d %H:%M:%S")
+ft = enddate.strftime("%Y-%m-%d %H:%M:%S")
 
 output_text = ("您选择了 " + st + " 到 " + ft + "\n"
                + Dep + "\n"
